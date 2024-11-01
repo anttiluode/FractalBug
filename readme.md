@@ -1,108 +1,116 @@
-# Fractal Adaptive System
+Fractal Bug 
 
-(A more fractal inspired version of Bug In The Machine) 
+A Hive Mind Adaptive System
 
-Edit: Added visualization for each sub layer. 
+"Resistance is futile" 
 
-## Overview
+https://youtu.be/Fcga4oYs4R0
 
-The **Fractal Adaptive System** is an advanced AI simulation that leverages fractal geometry principles to create a highly scalable and modular neural network architecture. Inspired by recent research on sparse autoencoders and their geometric feature structures, this system introduces recursive layering and sophisticated visualization techniques to emulate complex, self-similar patterns found in natural and artificial intelligence systems.
+A neural network simulation that combines collective intelligence with bidirectional encoding to create emergent behavior patterns.
+Overview
+The Hive Mind system creates an adaptive network where multiple layers work together to control movement and behavior. Each layer processes information both forward and backward in time, allowing the system to learn from past experiences while anticipating future states.
+Key Features
+Bidirectional Processing
 
-## Features
+Forward encoding: Helps predict future positions and movements
+Backward encoding: Maintains context from past experiences
+Temporal weighting: Balances past knowledge with future predictions
 
-- **Recursive Fractal Architecture:** 
-  - Each layer (`AdaptiveNetwork`) can contain multiple sub-layers, creating a self-similar, hierarchical structure.
-  - Dynamic addition and removal of sub-layers based on growth rates and pruning thresholds.
+Collective Decision Making
 
-- **Advanced Visualization:**
-  - **2D Fractal Visualization:** Recursive rendering of nodes and connections using Tkinter.
-  - **3D Visualization with Matplotlib:** Immersive 3D plots of the network's fractal structure.
-  - **Real-Time Node Visualization:** Separate window displaying node positions in 3D space.
+Multiple network layers contribute to movement
+Each layer has its own perspective and influence
+Weighted contributions based on layer depth and success
+Emergent behavior from layer interactions
 
-- **Dynamic Adaptation:**
-  - Hebbian learning rules for adaptive connections.
-  - Probabilistic growth and pruning of sub-layers to maintain optimal network complexity.
+Visual Learning
 
-- **Comprehensive Configuration:**
-  - Adjustable parameters including depth, growth rate, pruning threshold, and more.
-  - Webcam selection for sensory input processing.
+Processes webcam input for visual awareness
+Converts visual information into movement decisions
+Maintains visual memory for pattern recognition
 
-- **State Management:**
-  - Save and load system configurations and node states via JSON files.
+Interactive Visualization
 
-- **Robust Logging:**
-  - Detailed logging of system events and errors for easier debugging and monitoring.
+3D network structure visualization
+Movement pattern analysis
+Real-time performance monitoring
+Layer-specific focus controls
 
-## Installation
+Installation
 
-### Prerequisites
-
-- **Python 3.7 or higher**  
-Ensure you have Python installed. You can download it from [python.org](https://www.python.org/downloads/).
-
-### Clone the Repository
-
-```bash
 git clone https://github.com/anttiluode/fractalbug.git
 
 cd fractalbug
 
-Install Dependencies
+# Create a Virtual Environment (Optional but Recommended)
+
+python -m venv venv
+
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# install requirements file 
 
 pip install -r requirements.txt
 
-Run the application using:
+# Then Run the app
 
 python app.py
-```
 
-Controls
-Start: Begins the adaptive system's processing loop.
-Stop: Halts the processing loop.
-Visualize Nodes: Opens a separate window displaying a 3D visualization of the network's nodes and connections.
-Config: Opens the configuration window to adjust system parameters.
-Save: Saves the current system configuration and node states to a JSON file.
-Load: Loads a system configuration and node states from a JSON file.
-Key Differences from Previous Version (fractal bug)
-The Fractal Adaptive System represents a significant enhancement over the earlier version, referred to as the fractal bug. Below are the key differences:
+Start: Begin the hive mind system
+Stop: Pause system operation
+Visualize: Open the network visualization window
+Configure: Adjust system parameters
+
+Configuration Options
+
+Network structure (nodes, layers)
+Learning parameters
+Movement speed and responsiveness
+Vision settings
+
+Visualization Views
+
+Network Structure: See how layers connect and interact
+Movement Patterns: Watch how the system moves and adapts
+State Analysis: Monitor learning and performance
+
+How It Works
+
+Input Processing
+
+Camera captures visual information
+System extracts relevant features
+Information flows through network layers
+
+
+Decision Making
+
+Each layer processes information bidirectionally
+Layers contribute movement suggestions
+System combines suggestions into final movement
+
+
+Learning
+
+Successful movements are reinforced
+Network adapts connection strengths
+System builds collective memory
+
 
 Visualization
-2D Fractal Visualization
-The FractalNodeVisualizer class provides a Tkinter-based canvas that recursively draws nodes and their connections, reflecting the hierarchical fractal structure of the network.
 
-3D Visualization with Matplotlib
-The FractalMatplotlibVisualizer class utilizes Matplotlib's 3D plotting capabilities to render an immersive, three-dimensional view of the network's nodes and connections.
+Real-time display of network activity
+Movement tracking and analysis
+Performance monitoring
 
-Real-Time Node Visualization
-The NodeVisualizer class opens a separate window displaying a real-time scatter plot of node positions in 3D space, offering an additional perspective on the network's structure.
 
-Configuration
-Access the configuration window by clicking the Config button. Adjust the following parameters:
 
-Depth: Controls the recursion level of the network's fractal architecture.
+Requirements
 
-Pruning Threshold: Determines the threshold for removing sub-layers.
+Python 3.7+
+Webcam
+Graphics support for visualization
 
-Growth Rate: Sets the probability of adding a new sub-layer at each growth interval.
-
-Minimum Nodes: Specifies the minimum number of nodes per layer.
-
-Maximum Nodes: Defines the maximum number of nodes per layer.
-
-Webcam Selection: Choose the desired webcam for sensory input processing.
-
-Note: After making changes, click Apply to update the system's configuration.
-
-Saving and Loading System State
-Use the Save and Load buttons to persist and retrieve the system's configuration and node states.
-
-Save: Serializes the current system state to a JSON file.
-Load: Deserializes the system state from a JSON file, updating configurations and node connections accordingly.
-
-Logging
-
-All system events, including initialization, node and sub-layer management, visualization updates, and errors, are logged to both the console and a system.log file for monitoring and debugging purposes.
-
-Contributing
-
-This project is licensed under the MIT License.
+License
+MIT License
+This project demonstrates emergent behavior through collective intelligence and bidirectional processing, creating a system that can learn and adapt through experience while maintaining awareness of both past and future states.

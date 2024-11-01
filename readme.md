@@ -1,6 +1,5 @@
 # Fractal Adaptive System
 
-![Fractal Adaptive System](https://example.com/fractal-adaptive-system-banner.png)
 
 ## Table of Contents
 - [Overview](#overview)
@@ -55,22 +54,19 @@ Ensure you have Python installed. You can download it from [python.org](https://
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/fractal-adaptive-system.git
-cd fractal-adaptive-system
-Install Dependencies
-It's recommended to use a virtual environment:
+git clone https://github.com/anttiluode/fractalbug.git
 
-bash
-Copy code
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+cd fractalbug
+
+Install Dependencies
+
 pip install -r requirements.txt
-Usage
+
 Run the application using:
 
-bash
-Copy code
-python fractal_adaptive_system.py
+python app.py
+```
+
 Controls
 Start: Begins the adaptive system's processing loop.
 Stop: Halts the processing loop.

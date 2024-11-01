@@ -1,13 +1,13 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageTk
 import numpy as np
 import threading
 import queue
 import logging
 import time
 from collections import deque
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.decomposition import PCA
 import cv2
@@ -15,6 +15,7 @@ import json
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -24,11 +25,12 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+
 class SystemConfig:
     def __init__(self):
         self.display_width = 800
         self.display_height = 600
-        self.initial_nodes = 10
+        self.initial_nodes = 20
         self.initial_sub_layers = 2
         self.min_nodes = 50
         self.max_nodes = 500
@@ -63,6 +65,7 @@ class SystemConfig:
         for key, value in config_dict.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+
 class AdaptiveNode:
     def __init__(self, id, state=None, connections=None, position=None):
         self.id = id
@@ -79,7 +82,7 @@ class AdaptiveNode:
         self.state = np.tanh(input_signal)
         self.activation_history.append(self.state.copy())
 
-    def adapt(self, neighbor_states: Dict[int, np.ndarray]):
+    def adapt(self, neighbor_states: Dict[str, np.ndarray]):
         """
         Adapt connections based on neighbor states using Hebbian learning.
         neighbor_states: Dict[node_id, state_vector]
@@ -90,21 +93,21 @@ class AdaptiveNode:
             x = self.state
             y = neighbor_state
             eta = 0.01  # Learning rate
-            delta_w = eta * x * y
+            delta_w = eta * np.outer(x, y)  # Assuming weight matrix
             if neighbor_id in self.connections:
                 self.connections[neighbor_id] += delta_w
             else:
                 self.connections[neighbor_id] = delta_w
+            # Apply weight decay
+            self.connections[neighbor_id] *= 0.99  # Prevent unbounded growth
 
-            # Optional: Apply normalization or weight decay
-            self.connections[neighbor_id] *= 0.99  # Weight decay to prevent unbounded growth
 class AdaptiveNetwork:
     def __init__(self, config: SystemConfig, layer_id: str, depth: int = 1):
         self.config = config
         self.layer_id = layer_id
         self.depth = depth
-        self.nodes = {}
-        self.sub_layers = []
+        self.nodes: Dict[str, AdaptiveNode] = {}
+        self.sub_layers: List['AdaptiveNetwork'] = []
         self.node_lock = threading.Lock()
         self.initialize_nodes()
 
@@ -124,10 +127,15 @@ class AdaptiveNetwork:
     def initialize_nodes(self):
         """Initialize nodes with random positions."""
         for i in range(self.config.initial_nodes):
-            position = (np.random.uniform(-1, 1),
-                        np.random.uniform(-1, 1),
-                        np.random.uniform(-1, 1))
-            self.nodes[i] = AdaptiveNode(id=f"{self.layer_id}.{i}", position=position)
+            position = (
+                np.random.uniform(-1, 1),
+                np.random.uniform(-1, 1),
+                np.random.uniform(-1, 1)
+            )
+            self.nodes[f"{self.layer_id}.{i}"] = AdaptiveNode(
+                id=f"{self.layer_id}.{i}",
+                position=position
+            )
         logging.info(f"Layer {self.layer_id}: Initialized {self.config.initial_nodes} nodes.")
 
     def initialize_connections(self):
@@ -136,7 +144,8 @@ class AdaptiveNetwork:
         for i in range(len(node_ids)):
             for j in range(i + 1, len(node_ids)):
                 # Example fractal connection pattern: connect nodes with indices differing by powers of 2
-                if (j - i) & (j - i - 1) == 0:
+                index_diff = j - i
+                if (index_diff & (index_diff - 1)) == 0:
                     weight = np.random.uniform(0.5, 1.0)
                     self.nodes[node_ids[i]].connections[node_ids[j]] = weight
                     self.nodes[node_ids[j]].connections[node_ids[i]] = weight
@@ -178,6 +187,7 @@ class AdaptiveNetwork:
         if self.sub_layers:
             removed_layer = self.sub_layers.pop()
             logging.info(f"Layer {self.layer_id}: Removed sub-layer {removed_layer.layer_id}.")
+
 class SensoryProcessor:
     def __init__(self, config: SystemConfig, network: AdaptiveNetwork):
         self.config = config
@@ -199,6 +209,7 @@ class SensoryProcessor:
         if self.webcam:
             self.webcam.release()
             logging.info("Webcam released.")
+
 class AdaptiveSystem:
     def __init__(self, gui_queue: queue.Queue, vis_queue: queue.Queue, config: SystemConfig):
         self.config = config
@@ -238,41 +249,51 @@ class AdaptiveSystem:
                     features = self.sensory_processor.process_frame(frame)
                     dx = (features['brightness'] - 0.5) * 2 * self.config.movement_speed
                     dy = features['motion'] * self.config.movement_speed
-                    self.network.process_input(np.array([dx, dy]))  # Simplified input
+                    self.network.process_input(np.array([dx, dy]))
 
-                    # Possibly add a new node based on growth_rate
+                    # Layer management with proper pruning logic
                     current_time = time.time()
                     if (current_time - self.last_growth_time) > 0.1:  # Check every 100ms
+                        # Growth check
                         if np.random.rand() < self.config.growth_rate:
                             self.network.add_sub_layer()
-                        # Prune nodes based on pruning_threshold
-                        self.network.remove_sub_layer()
+                        
+                        # Pruning check - only remove if above threshold
+                        if len(self.network.sub_layers) > 0:
+                            if np.random.rand() < self.config.pruning_threshold:
+                                self.network.remove_sub_layer()
+                        
                         # Process Hebbian connections
-                        self.network.process_input(np.random.rand(10))  # Placeholder for Hebbian learning
+                        self.network.process_input(np.random.rand(10))
                         self.last_growth_time = current_time
 
-                    # Prepare data for GUI
+                    # GUI data preparation
                     gui_data = {
                         'frame': frame,
-                        'position': self.network.get_output().tolist(),  # Simplified position
-                        'direction': 0.0  # Placeholder
+                        'position': self.network.get_output().tolist(),
+                        'direction': 0.0
                     }
 
-                    # Prepare data for visualization
-                    with self.network.node_lock:
-                        positions = [node.position for node in self.network.nodes.values()]
+                    # Visualization data preparation
+                    layers_positions = self.collect_layer_positions(self.network)
                     vis_data = {
-                        'positions': positions
+                        'layers': layers_positions
                     }
 
-                    # Put data into respective queues if not full
                     if not self.gui_queue.full():
                         self.gui_queue.put(gui_data)
                     if not self.vis_queue.full():
                         self.vis_queue.put(vis_data)
             except Exception as e:
                 logging.error(f"Error in capture loop: {e}")
-            time.sleep(0.01)  # Maintain loop rate
+            time.sleep(0.01)
+
+    def collect_layer_positions(self, layer: AdaptiveNetwork) -> Dict[str, List[List[float]]]:
+        """Recursively collect node positions for each layer."""
+        positions = {layer.layer_id: [node.position for node in layer.nodes.values()]}
+        for sub_layer in layer.sub_layers:
+            positions.update(self.collect_layer_positions(sub_layer))
+        return positions
 
     def save_system(self, filepath: str):
         """Save the system's configuration and node states to a JSON file."""
@@ -282,7 +303,7 @@ class AdaptiveSystem:
                     node_id: {
                         'position': node.position,
                         'state': node.state.tolist(),
-                        'connections': {str(k): v.tolist() for k, v in node.connections.items()}
+                        'connections': {k: v for k, v in node.connections.items()}
                     } for node_id, node in self.network.nodes.items()
                 }
             data = {
@@ -309,19 +330,20 @@ class AdaptiveSystem:
                 self.network.nodes = {}
                 for node_id, node_info in data['nodes'].items():
                     node = AdaptiveNode(
-                        id=int(node_id),
+                        id=node_id,
                         position=node_info['position'],
                         state=np.array(node_info['state']),
-                        connections={int(k): np.array(v) for k, v in node_info['connections'].items()}
+                        connections=node_info['connections']
                     )
-                    self.network.nodes[int(node_id)] = node
+                    self.network.nodes[node_id] = node
             logging.info(f"System loaded from {filepath}.")
             messagebox.showinfo("Load System", f"System successfully loaded from {filepath}.")
         except Exception as e:
             logging.error(f"Failed to load system: {e}")
             messagebox.showerror("Load System", f"Failed to load system: {e}")
+
 class FractalNodeVisualizer:
-    """Visualization tool for fractal neural networks."""
+    """Visualization tool for fractal neural networks with layer-specific focus."""
     def __init__(self, parent, network: AdaptiveNetwork, zoom_level=1.0, pan_x=0, pan_y=0, depth=0):
         self.parent = parent
         self.network = network
@@ -335,6 +357,42 @@ class FractalNodeVisualizer:
         self.canvas.bind('<Button-2>', self._start_pan)
         self.canvas.bind('<B2-Motion>', self._on_pan)
         self.canvas.bind('<Configure>', self._on_canvas_resize)
+        self.selected_layer = None  # Currently selected layer for focus
+        self.create_layer_selection()
+        self.update_visualization()
+
+    def create_layer_selection(self):
+        """Create a dropdown for layer selection."""
+        control_frame = ttk.Frame(self.parent)
+        control_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(control_frame, text="Focus Layer:").pack(side=tk.LEFT, padx=5)
+        self.layer_var = tk.StringVar()
+        self.layer_combobox = ttk.Combobox(control_frame, textvariable=self.layer_var, state='readonly')
+        self.layer_combobox['values'] = self.get_all_layers()
+        if self.layer_combobox['values']:
+            self.layer_combobox.current(0)
+            self.selected_layer = self.layer_combobox.get()
+        self.layer_combobox.bind("<<ComboboxSelected>>", self.on_layer_select)
+        self.layer_combobox.pack(side=tk.LEFT, padx=5)
+
+    def get_all_layers(self) -> List[str]:
+        """Recursively retrieve all layer IDs in the network."""
+        layers = [self.network.layer_id]
+        for sub_layer in self.network.sub_layers:
+            layers.extend(self._get_sub_layers(sub_layer))
+        return layers
+
+    def _get_sub_layers(self, layer: AdaptiveNetwork) -> List[str]:
+        """Helper function to retrieve sub-layer IDs."""
+        layers = [layer.layer_id]
+        for sub_layer in layer.sub_layers:
+            layers.extend(self._get_sub_layers(sub_layer))
+        return layers
+
+    def on_layer_select(self, event):
+        """Handle layer selection changes."""
+        self.selected_layer = self.layer_var.get()
         self.update_visualization()
 
     def _on_mousewheel(self, event):
@@ -354,7 +412,7 @@ class FractalNodeVisualizer:
         self.update_visualization()
 
     def update_visualization(self):
-        """Recursively draw nodes and connections."""
+        """Recursively draw nodes and connections with layer focus."""
         self.canvas.delete("all")
         width = self.canvas.winfo_width()
         height = self.canvas.winfo_height()
@@ -364,10 +422,17 @@ class FractalNodeVisualizer:
         self._draw_layer(self.network, center_x, center_y, width, height, self.depth)
 
     def _draw_layer(self, layer: AdaptiveNetwork, center_x, center_y, width, height, depth):
-        """Recursively draw a single layer and its sub-layers."""
+        """Recursively draw a single layer and its sub-layers, focusing on the selected layer."""
         try:
             # Define scaling factors based on depth to avoid overlap
             scaling_factor = self.zoom_level / (depth + 1)
+
+            # Determine if this layer is the selected layer
+            is_selected = (layer.layer_id == self.selected_layer)
+
+            # Set color intensity based on selection
+            node_color_base = 'red' if is_selected else self._get_layer_color(depth)
+            connection_color_base = 'yellow' if is_selected else self._get_connection_color(depth)
 
             # Draw connections
             for node in layer.nodes.values():
@@ -378,11 +443,11 @@ class FractalNodeVisualizer:
                         y1 = center_y + node.position[1] * height / 4 * scaling_factor
                         x2 = center_x + target_node.position[0] * width / 4 * scaling_factor
                         y2 = center_y + target_node.position[1] * height / 4 * scaling_factor
-                        color = self._get_connection_color(weight)
+                        color = connection_color_base
                         self.canvas.create_line(
                             x1, y1, x2, y2,
                             fill=color,
-                            width=1
+                            width=1 if not is_selected else 2
                         )
 
             # Draw nodes
@@ -391,12 +456,13 @@ class FractalNodeVisualizer:
                 y = center_y + node.position[1] * height / 4 * scaling_factor
                 strength = np.mean(np.abs(node.state))
                 radius = max(5, strength * 10 * scaling_factor)
-                color = self._get_node_color(strength, depth)
+                color = node_color_base
                 self.canvas.create_oval(
                     x - radius, y - radius,
                     x + radius, y + radius,
                     fill=color,
-                    outline='white'
+                    outline='white',
+                    width=2 if is_selected else 1
                 )
 
             # Recursively draw sub-layers
@@ -410,27 +476,27 @@ class FractalNodeVisualizer:
         except Exception as e:
             logging.error(f"Error drawing layer {layer.layer_id}: {e}")
 
-    def _get_node_color(self, strength, depth):
-        """Return a color based on node strength and depth."""
-        # Color gradient from blue (low strength) to red (high strength)
-        red = int(min(255, strength * 255))
-        blue = int(min(255, (1 - strength) * 255))
-        green = 50  # Constant green for visibility
-        # Adjust color based on depth to enhance fractal perception
-        depth_factor = min(255, depth * 20)
-        return f'#{red:02x}{green:02x}{blue:02x}'
+    def _get_layer_color(self, depth):
+        """Return a color based on layer depth."""
+        # Color gradient from blue (shallow layers) to green (deeper layers)
+        green = int(min(255, depth * 30))
+        blue = int(max(0, 255 - depth * 30))
+        return f'#{0:02x}{green:02x}{blue:02x}'
 
-    def _get_connection_color(self, weight):
-        """Return a color based on connection weight."""
-        # Color gradient from light gray (low weight) to dark gray (high weight)
-        intensity = int(weight * 200 + 55)  # Avoid too dark
+    def _get_connection_color(self, depth):
+        """Return a color based on layer depth for connections."""
+        # Color gradient from light gray to dark gray based on depth
+        intensity = int(200 - depth * 20)
+        intensity = max(50, intensity)  # Minimum intensity
         return f'#{intensity:02x}{intensity:02x}{intensity:02x}'
+
 class FractalMatplotlibVisualizer:
     """Advanced visualization using matplotlib for fractal neural networks."""
     def __init__(self, parent, network: AdaptiveNetwork):
         self.parent = parent
         self.network = network
-        self.fig, self.ax = plt.subplots(figsize=(8, 6))
+        self.fig = plt.Figure(figsize=(8, 6))
+        self.ax = self.fig.add_subplot(111, projection='3d')
         self.canvas = FigureCanvasTkAgg(self.fig, master=parent)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -438,8 +504,8 @@ class FractalMatplotlibVisualizer:
 
     def update_visualization(self):
         """Render the fractal visualization using matplotlib."""
-        self.ax.clear()
-        self.ax.set_aspect('equal')
+        self.ax.cla()
+        self.ax.set_aspect('auto')
         self.ax.axis('off')
 
         # Draw nodes and connections using fractal patterns
@@ -490,20 +556,36 @@ class FractalMatplotlibVisualizer:
         # Color gradient from light gray (low weight) to dark gray (high weight)
         intensity = int(weight * 200 + 55)  # Avoid too dark
         return f'#{intensity:02x}{intensity:02x}{intensity:02x}'
+
 class NodeVisualizer:
-    """Separate window for 3D node visualization."""
-    def __init__(self, parent, vis_queue: queue.Queue):
+    """Separate window for 3D node visualization with layer selection."""
+    def __init__(self, parent, vis_queue: queue.Queue, network: AdaptiveNetwork):
         self.parent = parent
         self.vis_queue = vis_queue
+        self.network = network
         self.window = tk.Toplevel(parent)
         self.window.title("3D Node Visualization")
         self.window.geometry("800x600")
         self.window.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.selected_layer = tk.StringVar()
         self.create_widgets()
-        self.nodes_positions = []
+        self.nodes_positions = {}
         self.update_visualization()
 
     def create_widgets(self):
+        # Layer selection dropdown
+        control_frame = ttk.Frame(self.window)
+        control_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(control_frame, text="Select Layer:").pack(side=tk.LEFT, padx=5)
+        self.layer_combobox = ttk.Combobox(control_frame, textvariable=self.selected_layer, state='readonly')
+        self.layer_combobox['values'] = self.get_all_layers()
+        if self.layer_combobox['values']:
+            self.layer_combobox.current(0)
+            self.selected_layer.set(self.layer_combobox.get())
+        self.layer_combobox.bind("<<ComboboxSelected>>", self.on_layer_select)
+        self.layer_combobox.pack(side=tk.LEFT, padx=5)
+        
         # Create a matplotlib figure
         self.fig = plt.Figure(figsize=(8, 6))
         self.ax = self.fig.add_subplot(111, projection='3d')
@@ -514,20 +596,40 @@ class NodeVisualizer:
         self.ax.set_ylabel('Y')
         self.ax.set_zlabel('Z')
         self.ax.set_title("Adaptive Network Nodes")
-
+    
         # Embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.window)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+    
+    def get_all_layers(self) -> List[str]:
+        """Recursively retrieve all layer IDs in the network."""
+        layers = [self.network.layer_id]
+        for sub_layer in self.network.sub_layers:
+            layers.extend(self._get_sub_layers(sub_layer))
+        return layers
 
+    def _get_sub_layers(self, layer: AdaptiveNetwork) -> List[str]:
+        """Helper function to retrieve sub-layer IDs."""
+        layers = [layer.layer_id]
+        for sub_layer in layer.sub_layers:
+            layers.extend(self._get_sub_layers(sub_layer))
+        return layers
+
+    def on_layer_select(self, event):
+        """Handle layer selection changes."""
+        self.selected_layer.set(self.layer_combobox.get())
+        self.update_visualization()
+    
     def update_visualization(self):
+        """Render the 3D visualization based on selected layer."""
         try:
             while not self.vis_queue.empty():
                 data = self.vis_queue.get_nowait()
-                if 'positions' in data:
-                    self.nodes_positions = data['positions']
-                    logging.info(f"NodeVisualizer received {len(self.nodes_positions)} nodes.")
-
+                if 'layers' in data:
+                    self.layers_data = data['layers']
+                    logging.info(f"NodeVisualizer received data for {len(self.layers_data)} layers.")
+    
             self.ax.cla()  # Clear the current axes
             self.ax.set_xlim([-2, 2])
             self.ax.set_ylim([-2, 2])
@@ -536,20 +638,26 @@ class NodeVisualizer:
             self.ax.set_ylabel('Y')
             self.ax.set_zlabel('Z')
             self.ax.set_title("Adaptive Network Nodes")
-
-            # Extract positions
-            if self.nodes_positions:
-                xs, ys, zs = zip(*self.nodes_positions)
+    
+            # Get selected layer
+            selected = self.selected_layer.get()
+            if not selected:
+                return
+    
+            # Extract positions for the selected layer
+            positions = self.layers_data.get(selected, [])
+            if positions:
+                xs, ys, zs = zip(*positions)
                 # Normalize positions for visualization
                 xs_norm = [(x - min(xs)) / (max(xs) - min(xs) + 1e-5) * 4 - 2 for x in xs]
                 ys_norm = [(y - min(ys)) / (max(ys) - min(ys) + 1e-5) * 4 - 2 for y in ys]
                 zs_norm = [(z - min(zs)) / (max(zs) - min(zs) + 1e-5) * 4 - 2 for z in zs]
                 # Plot nodes
                 self.ax.scatter(xs_norm, ys_norm, zs_norm, c='b', marker='o', s=20, alpha=0.6)
-                logging.info(f"Plotted {len(xs_norm)} nodes.")
+                logging.info(f"Plotted {len(xs_norm)} nodes for layer {selected}.")
             else:
-                logging.info("No nodes to plot.")
-
+                logging.info(f"No nodes to plot for layer {selected}.")
+    
             self.canvas.draw()
         except Exception as e:
             logging.error(f"Error in node visualization update: {e}")
@@ -558,6 +666,7 @@ class NodeVisualizer:
 
     def on_close(self):
         self.window.destroy()
+
 class ConfigWindow:
     """Configuration window for adjusting system parameters."""
     def __init__(self, parent, config: SystemConfig, adaptive_system: AdaptiveSystem):
@@ -595,13 +704,17 @@ class ConfigWindow:
         # Minimum Nodes
         ttk.Label(self.window, text="Minimum Nodes:").grid(row=3, column=0, sticky=tk.W, **padding)
         self.min_nodes_var = tk.IntVar(value=self.config.min_nodes)
-        self.min_nodes_spinbox = ttk.Spinbox(self.window, from_=1, to=self.config.max_nodes, textvariable=self.min_nodes_var, width=10)
+        self.min_nodes_spinbox = ttk.Spinbox(
+            self.window, from_=1, to=self.config.max_nodes, textvariable=self.min_nodes_var, width=10
+        )
         self.min_nodes_spinbox.grid(row=3, column=1, **padding)
 
         # Maximum Nodes
         ttk.Label(self.window, text="Maximum Nodes:").grid(row=4, column=0, sticky=tk.W, **padding)
         self.max_nodes_var = tk.IntVar(value=self.config.max_nodes)
-        self.max_nodes_spinbox = ttk.Spinbox(self.window, from_=self.config.min_nodes, to=10000, textvariable=self.max_nodes_var, width=10)
+        self.max_nodes_spinbox = ttk.Spinbox(
+            self.window, from_=self.config.min_nodes, to=10000, textvariable=self.max_nodes_var, width=10
+        )
         self.max_nodes_spinbox.grid(row=4, column=1, **padding)
 
         # Webcam Selection
@@ -715,6 +828,7 @@ class ConfigWindow:
         except Exception as e:
             logging.error(f"Error applying configuration: {e}")
             messagebox.showerror("Configuration Error", f"Failed to apply configuration: {e}")
+
 class App:
     def __init__(self, root):
         self.root = root
@@ -812,10 +926,14 @@ class App:
                         cone_length = self.system.config.vision_cone_length
                         cone_angle = np.pi / 4
                         p1 = (x, y)
-                        p2 = (x + cone_length * np.cos(direction - cone_angle),
-                              y + cone_length * np.sin(direction - cone_angle))
-                        p3 = (x + cone_length * np.cos(direction + cone_angle),
-                              y + cone_length * np.sin(direction + cone_angle))
+                        p2 = (
+                            x + cone_length * np.cos(direction - cone_angle),
+                            y + cone_length * np.sin(direction - cone_angle)
+                        )
+                        p3 = (
+                            x + cone_length * np.cos(direction + cone_angle),
+                            y + cone_length * np.sin(direction + cone_angle)
+                        )
                         self.canvas.create_polygon(
                             p1[0], p1[1], p2[0], p2[1], p3[0], p3[1],
                             fill='#00ff00', stipple='gray50', outline='#00ff00', width=2
@@ -844,7 +962,7 @@ class App:
 
     def open_node_visualizer(self):
         if self.node_visualizer is None or not tk.Toplevel.winfo_exists(self.node_visualizer.window):
-            self.node_visualizer = NodeVisualizer(self.root, self.vis_queue)
+            self.node_visualizer = NodeVisualizer(self.root, self.vis_queue, self.system.network)
             logging.info("Node visualization window opened.")
         else:
             self.node_visualizer.window.lift()  # Bring to front if already open
@@ -855,6 +973,7 @@ class App:
         if self.node_visualizer and tk.Toplevel.winfo_exists(self.node_visualizer.window):
             self.node_visualizer.window.destroy()
         self.root.destroy()
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)

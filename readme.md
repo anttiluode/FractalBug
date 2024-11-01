@@ -1,19 +1,6 @@
 # Fractal Adaptive System
 
-
-## Table of Contents
-- [Overview](#overview)
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Key Differences from Previous Version](#key-differences-from-previous-version)
-- [Visualization](#visualization)
-- [Configuration](#configuration)
-- [Saving and Loading System State](#saving-and-loading-system-state)
-- [Logging](#logging)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
+(A more fractal inspired version of Bug In The Machine) 
 
 ## Overview
 

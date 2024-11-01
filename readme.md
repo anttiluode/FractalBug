@@ -2,6 +2,8 @@
 
 (A more fractal inspired version of Bug In The Machine) 
 
+Edit: Added visualization for each sub layer. 
+
 ## Overview
 
 The **Fractal Adaptive System** is an advanced AI simulation that leverages fractal geometry principles to create a highly scalable and modular neural network architecture. Inspired by recent research on sparse autoencoders and their geometric feature structures, this system introduces recursive layering and sophisticated visualization techniques to emulate complex, self-similar patterns found in natural and artificial intelligence systems.
